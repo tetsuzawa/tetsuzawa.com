@@ -8,7 +8,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
     title: 'tetsuzawa.com',
     // tagline: 'Dinosaurs are cool',
-    url: 'https://tetsuzawa.com',
+    url: 'https://www.tetsuzawa.com',
     baseUrl: '/',
     onBrokenLinks: 'throw',
     onBrokenMarkdownLinks: 'warn',
