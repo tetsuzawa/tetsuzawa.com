@@ -37,12 +37,6 @@ const config = {
                 },
                 blog: {
                     // showReadingTime: true,
-<<<<<<< Updated upstream
-                    // Remove this to remove the "edit this page" links.
-                    // editUrl:
-                    //   'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-=======
->>>>>>> Stashed changes
                     blogTitle: 'tetsuzawa.com',
                 },
                 theme: {
