@@ -44,6 +44,7 @@ const config = {
                     // Remove this to remove the "edit this page" links.
                     // editUrl:
                     //   'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+                    blogTitle: 'tetsuzawa.com',
                 },
                 theme: {
                     customCss: require.resolve('./src/css/custom.css'),
@@ -105,7 +106,7 @@ const config = {
                             },
                             {
                                 label: 'GitHub',
-                                href: 'https://github.com/tetsuzawa/docusaurus',
+                                href: 'https://github.com/tetsuzawa',
                             },
                         ],
                     },
@@ -134,6 +135,13 @@ const config = {
                 //         return "/";
                 //     }
                 // }
+            }
+        ],
+        [
+            '@docusaurus/plugin-ideal-image',
+            {
+                // quality: 70,
+                disableInDev: false,
             }
         ],
     ],
