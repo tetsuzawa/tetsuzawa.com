@@ -36,7 +36,7 @@ const config = {
                     sidebarPath: require.resolve('./sidebars.js'),
                 },
                 blog: {
-                    // showReadingTime: true,
+                    showReadingTime: false,
                     blogTitle: 'tetsuzawa.com',
                 },
                 theme: {
