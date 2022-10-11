@@ -1,0 +1,128 @@
+import Image from '@theme/IdealImage';
+import table from './table.png';
+
+# MySQL8 LOADでCSV取り込み
+
+
+- バルクインサートより早い。
+- カラムの順にloadされる
+- 先頭行にカラム名は要らない
+
+## csvの置き場
+
+ファイルはsecure_file_priv で指定されているディレクトリに置くと読み取りが楽。
+
+でないと↓のエラーで怒られるので設定を変えて再起動が必要となる。
+`ERROR 1290 (HY000): The MySQL server is running with the --secure-file-priv option so it cannot execute this statement`
+
+デフォルトは `/var/lib/mysql-files/`。
+
+```mysql
+SHOW VARIABLES LIKE 'secure_file_priv';
+```
+
+例
+
+```mysql
+mysql> SHOW VARIABLES LIKE 'secure_file_priv';
++------------------+-----------------------+
+| Variable_name    | Value                 |
++------------------+-----------------------+
+| secure_file_priv | /var/lib/mysql-files/ |
++------------------+-----------------------+
+1 row in set (0.00 sec)
+```
+
+## LOAD
+
+
+テーブル
+
+```
+CREATE TABLE `user` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` text NOT NULL,
+  PRIMARY KEY (`id`)
+)
+```
+
+CSV
+
+```csv title=users.csv
+1,i0VpEBOWfbZAVaBSo63bbH6xnAbnBE
+2,oonCrbZINl91huSS6AZPsK20FKcpXz
+3,kIRPxBFWGyEbcR8KykF8VH1oF7JCqH
+```
+
+```mysql
+LOAD DATA INFILE '/var/lib/mysql-files/users.csv' INTO TABLE hogedb.user FIELDS TERMINATED BY ',';
+```
+
+## 速度感
+
+テーブル構造
+
+<Image img={table} alt={"this graph shows user table and article table"}/>
+
+100行、107MBのCSV、外部キー制約ありで11秒くらい。
+
+```console
+$ head -n 3 articles.csv
+1,76dfZTPtLLKjAyS96HBqcbCtx3GIobuiF9Pl3XT4VWv87jUSCGE5FZv23CJ5SEnuRk4q4t7RFGOKtmF5MeYT4lUdOqo2gG0pn2AS,323
+2,bwkPf7bTbpYjlQxc9jcvMUhubBVT3U1RDnOtgB2hKyFi7qLAbIidcjfNF859oBpKMXRpAGaczgSoglonGCtNn47TAFKdzGlfXwG5,123
+3,Lr8xbQgs0PaBzEmKerx5eUlJyCUyhhe0N7QbOWSEwCXqGD7X5ZsoEqAQ4KYfw9jzef39OhsoPQBGgH6UfGSp3CRz9WJiBbK2lFDz,144
+
+$ wc -l articles.csv
+1000000 articles.csv
+
+$ du -sh articles.csv
+107M	articles.csv
+ ```
+
+```mysql
+mysql> LOAD DATA INFILE '/var/lib/mysql-files/articles.csv' INTO TABLE hogedb.article FIELDS TERMINATED BY ',' (id,content,user_id);
+Query OK, 1000000 rows affected (12.10 sec)
+```
+
+外部キー制約のチェックを無視すると1.25倍くらい速くなる。
+
+```mysql
+mysql> SET foreign_key_checks = 0;
+Query OK, 0 rows affected (0.00 sec)
+    
+mysql> LOAD DATA INFILE '/var/lib/mysql-files/articles.csv' INTO TABLE hogedb.article FIELDS TERMINATED BY ',' (id,content,user_id);
+Query OK, 1000000 rows affected (9.71 sec)
+```
+
+
+## Troubleshoot
+
+### LOAD 中に外部キーを無視したい
+
+```mysql
+SET foreign_key_checks = 0;
+```
+
+を実行してからLOADする。
+
+### CSVに一部のカラムしか含まれていない
+
+
+- id autoincrementとかtimestamp = now()を使いたいケースに
+  - timestampはcsvすべての行で同じになる
+- テーブル構造変えた後とかに
+
+```
+ERROR 1261 (01000): Row 1 doesn't contain data for all columns
+```
+
+こんなエラーが出たら[カラムリストを明示的に指定することで回避できる](https://dev.mysql.com/doc/refman/8.0/ja/load-data.html#:~:text=%E7%99%BA%E7%94%9F%E3%81%97%E3%81%BE%E3%81%99%E3%80%82-,%E3%82%AB%E3%83%A9%E3%83%A0%E3%83%AA%E3%82%B9%E3%83%88%E3%81%AE%E6%8C%87%E5%AE%9A,-%E6%AC%A1%E3%81%AE%E4%BE%8B)。
+
+LOAD DATA INFILE '/var/lib/mysql-files/users.csv' INTO TABLE hogedb.user FIELDS TERMINATED BY ',' (id,name);
+
+カラムの順序はcsvの並びで指定する。
+
+
+
+
+

@@ -62,7 +62,7 @@ const config = {
                 items: [
                     {
                         type: 'doc',
-                        docId: 'intro',
+                        docId: '/category/isucon-メモ置き場',
                         position: 'left',
                         label: 'Notes',
                     },
