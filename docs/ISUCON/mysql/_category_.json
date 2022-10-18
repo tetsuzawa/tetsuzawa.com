@@ -1,8 +1,8 @@
 {
-  "label": "MySQL関連",
-  "position": 1,
+  "label": "MySQL",
+  "position": 3,
   "link": {
     "type": "generated-index",
-    "description": "MySQL"
+    "description": "MySQL関連"
   }
 }
