@@ -24,6 +24,10 @@ result_dir="/home/isucon/result"
 EOF
 
 # read env
+# 計測用自作env
+. /tmp/prepared_env
+
+# isucon serviceで使うenv
 . ./env.sh
 
 # ====== go ======
@@ -31,6 +35,7 @@ make -C webapp/go build
 sudo systemctl restart xxx.golang.service
 
 # ====== nginx ======
+sudo touch ${nginx_access_log} ${nginx_error_log}
 sudo cp ${nginx_access_log} ${nginx_access_log}.prev
 sudo truncate -s 0 ${nginx_access_log}
 sudo cp ${nginx_error_log} ${nginx_error_log}.prev
@@ -39,6 +44,8 @@ sudo nginx -t
 sudo systemctl restart nginx
 
 # ====== mysql ======
+sudo touch ${mysql_slow_log} ${mysql_error_log}
+sudo chown mysql:mysql ${mysql_slow_log} ${mysql_error_log}
 sudo cp ${mysql_slow_log} ${mysql_slow_log}.prev
 sudo truncate -s 0 ${mysql_slow_log}
 sudo cp ${mysql_error_log} ${mysql_error_log}.prev
@@ -66,8 +73,11 @@ cd `dirname $0`
 echo "# Analyze"
 ################################################################################
 
+# read env
+# 計測用自作env
 . /tmp/prepared_env
 
+# isucon serviceで使うenv
 . ./env.sh
 
 result_dir=$HOME/result
@@ -78,6 +88,7 @@ mkdir -p ${result_dir}
 # alp
 ALPM="/int/\d+,/uuid/[A-Za-z0-9_]+,/6digits/[a-z0-9]{6}"
 OUTFORMT=count,1xx,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p95,min_body,max_body,avg_body
+cp ${result_dir}/alp.md ${result_dir}/alp.md.prev
 alp ltsv --file=${nginx_access_log} \
   --nosave-pos \
   --sort sum \
@@ -91,6 +102,7 @@ alp ltsv --file=${nginx_access_log} \
 # mysqlowquery
 #sudo mysqldumpslow -s t ${mysql_slow_log} > ${result_dir}/mysqld-slow.txt
 
+cp ${result_dir}/pt-query-digest.txt ${result_dir}/pt-query-digest.txt.prev
 #pt-query-digest --explain "h=${DB_HOST},u=${DB_USER},p=${DB_PASS},D=${DB_DATABASE}" ${mysql_slow_log} \
 #  > ${result_dir}/pt-query-digest.txt
 pt-query-digest ${mysql_slow_log} > ${result_dir}/pt-query-digest.txt

@@ -17,7 +17,7 @@ rsync -avz ~/.ssh/$KEY_NAME.pem c:~/.ssh/id_rsa && rsync -avz ~/.ssh/$KEY_NAME.p
 ```shell
 git config --global core.filemode false && \
 git config --global user.name "isucon" && \
-git config --global user.email "root@hoge.com" && \
+git config --global user.email "root@example.com" && \
 git config --global color.ui auto && \
 git config --global core.editor 'vim -c "set fenc=utf-8"' && \
 git config --global push.default current && \
@@ -45,8 +45,8 @@ alp --version
 
 
 # netdata
-echo -e "\n--------------------  netdata  --------------------\n"
-sudo yes | curl -Lo /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && yes | sudo sh /tmp/netdata-kickstart.sh --no-updates all
+# echo -e "\n--------------------  netdata  --------------------\n"
+# sudo yes | curl -Lo /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && yes | sudo sh /tmp/netdata-kickstart.sh --no-updates all
 
 
 # vim
@@ -166,8 +166,12 @@ sudo chmod 775 -R /home/isucon/etc/nginx
 sudo chmod 777 -R /var/log/nginx
 #@#sudo chown isucon:isucon -R /home/isucon/etc/nginx
 sudo nginx -t
+```
 
+```shell
 git add etc/nginx
+git commit -m "add nginx conf"
+git push
 ```
 
 b, cで
@@ -185,7 +189,7 @@ sudo systemctl status nginx
 
 ### mysql8をgit addしたいとき
 
-```
+```shell
 mkdir -p ./etc
 mkdir -p ./backup/etc
 sudo cp -r /etc/mysql ./backup/etc/mysql
@@ -198,9 +202,13 @@ sudo ln /etc/mysql/mysql.conf.d/mysqld.cnf /home/isucon/etc/mysql/mysql.conf.d/m
 sudo chmod 755 -R /home/isucon/etc/mysql
 mkdir -p /var/log/mysql
 sudo chmod 777 -R /var/log/mysql
-
-git add etc/mysql
 ``````
+
+```shell
+git add etc/mysql
+git commit -m "add mysql conf"
+git push
+```
 
 b, cで
 
