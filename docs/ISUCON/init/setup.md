@@ -52,7 +52,6 @@ alp --version
 # vim
 echo -e "\n--------------------  vim  --------------------\n"
 sudo apt install -y vim
-echo 'inoremap jj <Esc>' >> .vimrc
 vim --version
 
 
@@ -85,6 +84,18 @@ rm -rf gh_2.17.0_linux_amd64*
 gh --version
 
 
+# trdsql
+curl -sSLO https://github.com/noborus/trdsql/releases/download/v0.10.1/trdsql_v0.10.1_linux_amd64.zip
+unzip trdsql_v0.10.1_linux_amd64.zip
+sudo install trdsql_v0.10.1_linux_amd64/trdsql /usr/local/bin/trdsql
+rm -rf trdsql_v0.10.1_linux_amd64*
+trdsql -version
+
+
+# jq
+sudo apt install -y jq
+
+
 # netstat
 echo -e "\n--------------------  netstat  --------------------\n"
 sudo apt install -y net-tools
@@ -94,9 +105,11 @@ sudo apt install -y net-tools
 echo -e "\n--------------------  dstat  --------------------\n"
 sudo apt install -y dstat
 
+
 # sysstat
 echo -e "\n--------------------  dstat  --------------------\n"
 sudo apt install -y sysstat
+
 
 # listroute 
 # see https://github.com/tetsuzawa/listroute
@@ -119,7 +132,7 @@ rsync -avz setup-tools.sh c:~/
 各インスタンスで
 
 ```shell
-. setup-tools.sh
+./setup-tools.sh
 ```
 
 
@@ -236,11 +249,63 @@ sudo systemctl status mysql
 mkdir -p $HOME/result
 ```
 
-## nginxをalpに対応させる
+
+## appのログ吐き出し先を変える
+
+```shell
+mkdir -p $HOME/log
+```
+
+
+よしなに
+
+## nginxをalpに対応させる&吐き出し先を変える
 
 access logの設定を [access logをalpに対応する](../nginx/alp) を参考にやる。
 
 メインのファイルを読んで [analyze.sh](./prepare-analyze) のalpのmatch stringを書き換える。
+
+```shell
+mkdir -p $HOME/log
+```
+
+
+## logrotateのconfを置く
+
+```shell
+sudo cat << EOF > /home/isucon/etc/logrotate.d/nginx 
+/home/isucon/log/nginx/access.log {
+  missingok
+  ifempty
+  nocompress
+  copytruncate
+  rotate 10
+  su isucon isucon
+}
+
+/home/isucon/log/nginx/error.log {
+  missingok
+  ifempty
+  nocompress
+  copytruncate
+  rotate 10
+  su isucon isucon
+}
+EOF
+```
+
+```shell
+sudo cat << EOF > /home/isucon/etc/logrotate.d/app
+/home/isucon/log/app/app.log {
+  missingok
+  ifempty
+  nocompress
+  copytruncate
+  rotate 10
+  su isucon isucon
+}
+EOF
+```
 
 ### goファイルからルーティングの一覧を出力したいとき
 
