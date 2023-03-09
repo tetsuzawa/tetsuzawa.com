@@ -195,6 +195,7 @@ sudo rm -rf /etc/nginx
 sudo ln -s /home/isucon/etc/nginx /etc/nginx
 sudo chmod 775 -R /etc/nginx
 sudo chown -R root:root /etc/nginx
+mkdir -p /home/isucon/log/nginx
 sudo nginx -t
 sudo systemctl restart nginx
 sudo systemctl status nginx
