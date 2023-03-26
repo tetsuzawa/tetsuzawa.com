@@ -1,5 +1,8 @@
 # too many open files
 
+
+## ユーザーが実行するコマンドで出る場合
+
 ファイルディスクリプタの制限に引っかかっている。
 
 シェルから実行するようなものは `/etc/security/limits.conf` に↓を追記する
@@ -39,4 +42,22 @@ $ ulimit -n
 `
 
 
+## systemdで実行するコマンドで出る場合
 
+unitファイルの場所を確認
+
+```shell
+sudo systemctl cat xxx
+```
+
+↓を追記
+
+```ini
+[Service]
+LimitNOFILE=65535
+```
+
+```shell
+sudo daemon-reload
+sudo systemctl restart ...
+```

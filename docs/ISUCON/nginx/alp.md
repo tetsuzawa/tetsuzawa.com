@@ -1,4 +1,4 @@
-# access logをalpに対応する
+# access logをalpに対応する & 出力先を変える
 
 ltsv
 
@@ -22,6 +22,7 @@ log_format ltsv "time:$time_local"
             "\trequest_id:$request_id"
             "\tcache_status:$upstream_cache_status";
 access_log  /home/isucon/log/nginx/access.log ltsv;
+error_log  /home/isucon/log/nginx/error.log;
 ```
 
 json
@@ -45,4 +46,5 @@ log_format json escape=json '{"time":"$time_local",'
                             '"trequest_id":"$request_id",'
                             '"cache_status":"$upstream_cache_status"}';
 access_log  /home/isucon/log/nginx/access.log json;
+error_log  /home/isucon/log/nginx/error.log;
 ```
