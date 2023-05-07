@@ -92,10 +92,10 @@ setup/sshd:
 Makefileをインスタンスに送る
 
 ```
-rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_BENCH:~/
-rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_A:~/
-rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_B:~/
-rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_C:~/
+yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_BENCH:~/ \
+  && yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_A:~/ \
+  && yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_B:~/ \
+  && yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_C:~/
 ```
 
 sshのセットアップをする
