@@ -43,7 +43,7 @@ log_format json escape=json '{"time":"$time_local",'
                             '"runtime":"$upstream_http_x_runtime",'
                             '"response_time":"$upstream_response_time",'
                             '"vhost":"$host",'
-                            '"trequest_id":"$request_id",'
+                            '"request_id":"$request_id",'
                             '"cache_status":"$upstream_cache_status"}';
 access_log  /home/isucon/log/nginx/access.log json;
 error_log  /home/isucon/log/nginx/error.log;

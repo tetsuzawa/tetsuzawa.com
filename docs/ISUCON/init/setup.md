@@ -1,20 +1,42 @@
 # 最初にやること
 
-## githubにsshできるようにする
+## githubのリポジトリ作成
 
-AWS上で作ったssh keyの公開鍵をgithubにも登録しておくと便利
-
-KEY_NAME=<ssh key名>
+## デプロイキーの作成
 
 ```shell
-rsync -avz ~/.ssh/$KEY_NAME.pem a:~/.ssh/id_rsa && rsync -avz ~/.ssh/$KEY_NAME.pub a:~/.ssh/id_rsa.pub
-rsync -avz ~/.ssh/$KEY_NAME.pem b:~/.ssh/id_rsa && rsync -avz ~/.ssh/$KEY_NAME.pub b:~/.ssh/id_rsa.pub
-rsync -avz ~/.ssh/$KEY_NAME.pem c:~/.ssh/id_rsa && rsync -avz ~/.ssh/$KEY_NAME.pub c:~/.ssh/id_rsa.pub
+ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/isucon-xx-xxxxxx
 ```
+
+## githubにデプロイキーを登録
+
+allow write accessにチェックを入れる
+
+## デプロイキーを各インスタンスにrsync
+
+```shell
+export KEY_NAME=isucon-xx-xxxxxx
+export ISU_HOSTS="a b c"
+bash -c '
+set -eu
+for HOST in $ISU_HOSTS; do
+    echo "--------------------------------------"
+    echo "host: $HOST, KEY_NAME: $KEY_NAME"
+    
+    rsync -avz ~/.ssh/$KEY_NAME $HOST:~/.ssh/id_rsa
+    rsync -avz ~/.ssh/$KEY_NAME.pub $HOST:~/.ssh/id_rsa.pub
+done'
+```
+
+
+## gitの設定
+
+gitは最新を使いたいのでppaを追加してインストール
 
 各インスタンス内で↓を実行
 
 ```shell
+sudo add-apt-repository ppa:git-core/ppa && sudo apt update && sudo apt install -y git
 git config --global core.filemode false && \
 git config --global user.name "isucon" && \
 git config --global user.email "root@example.com" && \
@@ -63,24 +85,30 @@ pt-query-digest --version
 
 # go
 echo -e "\n--------------------  go  --------------------\n"
-curl -sSLo go.tar.gz https://go.dev/dl/go1.19.2.linux-amd64.tar.gz
+curl -sSLo go.tar.gz https://go.dev/dl/go1.20.3.linux-amd64.tar.gz
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go.tar.gz
 sudo rm -rf go.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bash_profile
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-echo 'export PATH=$PATH:/home/isucon/go/bin' >> ~/.bash_profile
-echo 'export PATH=$PATH:/home/isucon/go/bin' >> ~/.bashrc
-export PATH=$PATH:/usr/local/go/bin
-export PATH=$PATH:/home/isucon/go/bin
+echo 'export PATH=/usr/local/go/bin:$PATH' >> ~/.bash_profile
+echo 'export PATH=/usr/local/go/bin:$PATH' >> ~/.bashrc
+echo 'export PATH=/home/isucon/go/bin:$PATH' >> ~/.bash_profile
+echo 'export PATH=/home/isucon/go/bin:$PATH' >> ~/.bashrc
+echo 'export GOROOT=' >> ~/.bash_profile
+echo 'export GOROOT=' >> ~/.bashrc
+echo 'export GOPATH=/home/isucon/go' >> ~/.bash_profile
+echo 'export GOPATH=/home/isucon/go' >> ~/.bashrc
+export PATH=/usr/local/go/bin:$PATH
+export PATH=/home/isucon/go/bin:$PATH
+export GOROOT=
+export GOPATH=/home/isucon/go
 go version
 
 
 # gh
 echo -e "\n--------------------  gh  --------------------\n"
-curl -sSLO https://github.com/cli/cli/releases/download/v2.17.0/gh_2.17.0_linux_amd64.tar.gz
-tar -xf gh_2.17.0_linux_amd64.tar.gz
-sudo install gh_2.17.0_linux_amd64/bin/gh /usr/local/bin/gh
-rm -rf gh_2.17.0_linux_amd64*
+curl -sSLO https://github.com/cli/cli/releases/download/v2.27.0/gh_2.27.0_linux_amd64.tar.gz
+tar -xf gh_2.27.0_linux_amd64.tar.gz
+sudo install gh_2.27.0_linux_amd64/bin/gh /usr/local/bin/gh
+rm -rf gh_2.27.0_linux_amd64*
 gh --version
 
 
@@ -132,7 +160,7 @@ rsync -avz setup-tools.sh c:~/
 各インスタンスで
 
 ```shell
-./setup-tools.sh
+bash setup-tools.sh
 ```
 
 
@@ -140,6 +168,8 @@ rsync -avz setup-tools.sh c:~/
 
 ```shell
 git init
+git config --global --unset-all core.filemode
+git config --unset-all core.filemode
 git config core.filemode false
 git commit -m "empty" --allow-empty
 git remote add origin git@github.com:<user name>/<repo name>.git
@@ -163,6 +193,12 @@ rsync -avz .git isucon@192.168.0.13:~/
 
 ```shell
 sudo systemctl list-units --type=service
+```
+
+## サービスの起動設定を確認したいとき
+
+```shell
+sudo systemctl cat isucon-xx.service
 ```
 
 ### nginxをgit addしたいとき
@@ -293,6 +329,9 @@ sudo cat << EOF > /home/isucon/etc/logrotate.d/nginx
   su isucon isucon
 }
 EOF
+
+chown root:root -R /home/isucon/etc/logrotate.d
+chmod 644 /home/isucon/etc/logrotate.d/*
 ```
 
 ```shell
@@ -306,6 +345,9 @@ sudo cat << EOF > /home/isucon/etc/logrotate.d/app
   su isucon isucon
 }
 EOF
+
+chown root:root -R /home/isucon/etc/logrotate.d
+chmod 644 /home/isucon/etc/logrotate.d/*
 ```
 
 ### goファイルからルーティングの一覧を出力したいとき
@@ -332,3 +374,8 @@ DB_USER=
 DB_PASS=
 DB_DATABASE=
 ```
+
+
+## アプリケーションの仕様確認
+
+## 初期化の方法確認
