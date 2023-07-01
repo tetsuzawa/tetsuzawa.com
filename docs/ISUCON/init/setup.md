@@ -347,6 +347,7 @@ mkdir -p $HOME/log
 ## logrotateのconfを置く
 
 ```shell
+mkdir -p /home/isucon/etc/logrotate.d
 sudo cat << EOF > /home/isucon/etc/logrotate.d/nginx 
 /home/isucon/log/nginx/access.log {
   missingok
@@ -367,8 +368,8 @@ sudo cat << EOF > /home/isucon/etc/logrotate.d/nginx
 }
 EOF
 
-chown root:root -R /home/isucon/etc/logrotate.d
-chmod 644 /home/isucon/etc/logrotate.d/*
+sudo chown root:root -R /home/isucon/etc/logrotate.d
+sudo chmod 644 /home/isucon/etc/logrotate.d/*
 ```
 
 ```shell
