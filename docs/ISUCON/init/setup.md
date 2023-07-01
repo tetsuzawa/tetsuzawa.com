@@ -15,17 +15,24 @@ allow write accessにチェックを入れる
 ## デプロイキーを各インスタンスにrsync
 
 ```shell
-export KEY_NAME=isucon-xx-xxxxxx
-export ISU_HOSTS="a b c"
+export DEPLOY_KEY_NAME=isucon-xx-xxxxxx
+export ISU_USER=isucon
+export TARGET_HOSTS="35.75.87.180 13.113.71.227 ..."
 bash -c '
 set -eu
-for HOST in $ISU_HOSTS; do
+for HOST in $TARGET_HOSTS; do
     echo "--------------------------------------"
-    echo "host: $HOST, KEY_NAME: $KEY_NAME"
+    echo "host: $HOST, DEPLOY_KEY_NAME: $DEPLOY_KEY_NAME"
     
-    rsync -avz ~/.ssh/$KEY_NAME $HOST:~/.ssh/id_rsa
-    rsync -avz ~/.ssh/$KEY_NAME.pub $HOST:~/.ssh/id_rsa.pub
+    rsync -avz ~/.ssh/$DEPLOY_KEY_NAME $ISU_USER@$HOST:~/.ssh/id_rsa
+    rsync -avz ~/.ssh/$DEPLOY_KEY_NAME.pub $ISU_USER@$HOST:~/.ssh/id_rsa.pub
 done'
+```
+
+## (一応) デプロイキーのpub keyで各インスタンス内から相互にsshできるようにする
+
+```shell
+bash -c 'for HOST in $TARGET_HOSTS; do ssh $ISU_USER@$HOST "cat /home/isucon/.ssh/id_rsa.pub >> /home/isucon/.ssh/authorized_keys"; done'
 ```
 
 
@@ -47,6 +54,22 @@ git config --global init.defaultBranch main && \
 git config --global alias.st status 
 ```
 
+```shell
+bash -c '
+set -eux
+for HOST in $TARGET_HOSTS; do
+    ssh $ISU_USER@$HOST "sudo add-apt-repository ppa:git-core/ppa && sudo apt update && sudo apt install -y git"
+    ssh $ISU_USER@$HOST git config --global core.filemode false
+    ssh $ISU_USER@$HOST git config --global user.name "isucon"
+    ssh $ISU_USER@$HOST git config --global user.email "root@example.com"
+    ssh $ISU_USER@$HOST git config --global color.ui auto
+    ssh $ISU_USER@$HOST "git config --global core.editor \'vim -c \"set fenc=utf-8\"\'"
+    ssh $ISU_USER@$HOST git config --global push.default current
+    ssh $ISU_USER@$HOST git config --global init.defaultBranch main
+    ssh $ISU_USER@$HOST git config --global alias.st status 
+done'
+```
+
 
 ## 各種ツールのインストール
 
@@ -56,6 +79,10 @@ git config --global alias.st status
 #!/usr/bin/env bash
 
 set -eu
+
+# tools
+echo -e "\n--------------------  tools  --------------------\n"
+sudo apt install -y unzip make
 
 # alp
 echo -e "\n--------------------  alp  --------------------\n"
@@ -152,15 +179,24 @@ echo -e "\n\nall ok\n"
 ```shell
 chmod +x setup-tools.sh
 
-rsync -avz setup-tools.sh a:~/
-rsync -avz setup-tools.sh b:~/
-rsync -avz setup-tools.sh c:~/
+rsync -avz setup-tools.sh a:/tmp/
+rsync -avz setup-tools.sh b:/tmp/
+rsync -avz setup-tools.sh c:/tmp/
 ```
 
 各インスタンスで
 
 ```shell
 bash setup-tools.sh
+```
+
+```shell
+bash -c '
+set -eux
+for HOST in $TARGET_HOSTS; do
+    rsync -avz setup-tools.sh $ISU_USER@$HOST:/tmp/
+    ssh $ISU_USER@$HOST bash /tmp/setup-tools.sh
+done'
 ```
 
 
@@ -173,6 +209,7 @@ git config --unset-all core.filemode
 git config core.filemode false
 git commit -m "empty" --allow-empty
 git remote add origin git@github.com:<user name>/<repo name>.git
+git add ...
 git push -u origin main
 ```
 
@@ -226,7 +263,7 @@ git push
 b, cで
 
 ```shell
-git pull
+git pull origin main
 sudo rm -rf /etc/nginx
 sudo ln -s /home/isucon/etc/nginx /etc/nginx
 sudo chmod 775 -R /etc/nginx

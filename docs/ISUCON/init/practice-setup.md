@@ -22,6 +22,8 @@ IP_C = "13.114.137.88"
 
 https://github.com/tetsuzawa/tfoutput_to_ssh_config を使うと便利
 
+`pbpaste | grep -E -o  '([0-9.]+)' | xargs echo -n ' '`
+
 ```console
 $ pbpaste | tfoutput_to_ssh_config
 Host bench
@@ -34,32 +36,24 @@ Host a
     HostName 35.77.122.102
     User isucon
     ServerAliveInterval 60
+    ForwardAgent yes
 
 Host b
     HostName 52.69.120.236
     User isucon
     ServerAliveInterval 60
+    ForwardAgent yes
 
 Host c
     HostName 13.114.137.88
     User isucon
     ServerAliveInterval 60
+    ForwardAgent yes
 ```
 
 
 ## 3. isuconユーザーでログインできるようにする
 
-インスタンスのIP addressを環境変数に入れておく
-
-https://github.com/tetsuzawa/tfoutput_to_export_snipet を使うと便利
-
-```console
-$ pbpaste | tfoutput_to_export_snipet 
-export IP_A=35.77.122.102 && \
-export IP_B=52.69.120.236 && \
-export IP_BENCH=43.206.55.19 && \
-export IP_C=13.114.137.88
-```
 
 KEY_NAMEも環境変数に入れておく
 
@@ -88,23 +82,26 @@ setup/sshd:
 	systemctl restart sshd
 ```
 
+```shell
+export TARGET_HOSTS=(pbpaste | grep -E -o  '([0-9.]+)' | xargs echo -n ' ')
+```
+
+```shell
+echo $TARGET_HOSTS
+```
+
 
 Makefileをインスタンスに送る
 
-```
-yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_BENCH:~/ \
-  && yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_A:~/ \
-  && yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_B:~/ \
-  && yes yes | rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem" Makefile ubuntu@$IP_C:~/
+
+```shell
+bash -c 'for HOST in $TARGET_HOSTS; do rsync -avz -e "ssh -i ~/.ssh/$KEY_NAME.pem -oStrictHostKeyChecking=no" Makefile ubuntu@$HOST:~/; done'
 ```
 
 sshのセットアップをする
 
 ```
-ssh -i ~/.ssh/$KEY_NAME.pem ubuntu@$IP_BENCH sudo make setup/authorized_keys setup/sshd
-ssh -i ~/.ssh/$KEY_NAME.pem ubuntu@$IP_A sudo make setup/authorized_keys setup/sshd
-ssh -i ~/.ssh/$KEY_NAME.pem ubuntu@$IP_B sudo make setup/authorized_keys setup/sshd
-ssh -i ~/.ssh/$KEY_NAME.pem ubuntu@$IP_C sudo make setup/authorized_keys setup/sshd
+bash -c 'for HOST in $TARGET_HOSTS; do ssh -i ~/.ssh/$KEY_NAME.pem ubuntu@$HOST sudo make setup/authorized_keys setup/sshd; done'
 ```
 
 ログインできればOK
