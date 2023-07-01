@@ -388,6 +388,13 @@ chown root:root -R /home/isucon/etc/logrotate.d
 chmod 644 /home/isucon/etc/logrotate.d/*
 ```
 
+
+## github subscribe
+
+```shell
+/github subscribe tetsuzawa/isucon-xx-xxx comments:"channel"
+```
+
 ### goファイルからルーティングの一覧を出力したいとき
 
 
