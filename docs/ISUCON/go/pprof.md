@@ -2,7 +2,7 @@
 
 ## 事前準備
 
-import ブロック追加
+importブロック追加
 
 ```go
 import  _ "net/http/pprof"

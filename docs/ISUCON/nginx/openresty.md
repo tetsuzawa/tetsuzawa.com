@@ -16,6 +16,20 @@ sudo apt-get update
 sudo apt-get -y install openresty
 ```
 
+luarocks
+
+```
+wget http://luarocks.org/releases/luarocks-2.0.13.tar.gz
+tar -xzvf luarocks-2.0.13.tar.gz
+cd luarocks-2.0.13/
+./configure --prefix=/usr/local/openresty/luajit \
+    --with-lua=/usr/local/openresty/luajit/ \
+    --lua-suffix=jit \
+    --with-lua-include=/usr/local/openresty/luajit/include/luajit-2.1
+make
+sudo make install
+```
+
 ## nginx confをopenrestyにも反映させるには
 
 systemdのExecStartでもともとのnginx confを読むように指定させれば良い
@@ -43,11 +57,13 @@ systemdのExecStartでもともとのnginx confを読むように指定させれ
 ## 有効化
 
 ```
+sudo systemctl daemon-reload
 sudo systemctl enable openresty
 sudo systemctl start openresty
+sudo systemctl status openresty
 ```
 
-```diff file="prepare.sh"
+```diff title="prepare.sh"
 -sudo nginx -t
 -sudo systemctl restart nginx
 +sudo openresty -c /etc/nginx/nginx.conf -t
@@ -60,7 +76,7 @@ sudo systemctl start openresty
 https://github.com/tetsuzawa/isucon12-final-suburi-20230701/pull/6/files
 
 
-```lua /etc/nginx/lua/routing_logic.lua
+```lua titile=/etc/nginx/lua/routing_logic.lua
 local uri = ngx.var.uri
 local id = string.match(uri, "/user/(%d+)")
 if id then

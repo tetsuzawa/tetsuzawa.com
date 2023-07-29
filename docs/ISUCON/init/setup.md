@@ -86,11 +86,19 @@ sudo apt install -y unzip make
 
 # alp
 echo -e "\n--------------------  alp  --------------------\n"
-curl -sSLo alp.zip https://github.com/tkuchiki/alp/releases/download/v1.0.12/alp_linux_amd64.zip
+curl -sSLo alp.zip https://github.com/tkuchiki/alp/releases/download/v1.0.14/alp_linux_amd64.zip
 unzip alp.zip
 sudo install alp /usr/local/bin/alp
 rm -rf alp alp.zip
 alp --version
+
+# alp-trace
+echo -e "\n--------------------  alp-trace  --------------------\n"
+curl -sSLo alp-trace.zip https://github.com/tetsuzawa/alp-trace/releases/download/v0.0.5/alp-trace_linux_amd64.zip
+unzip alp-trace.zip
+sudo install alp-trace /usr/local/bin/alp-trace
+rm -rf alp-trace alp-trace.zip
+alp-trace --version
 
 
 # netdata
@@ -162,26 +170,47 @@ sudo apt install -y dstat
 
 
 # sysstat
-echo -e "\n--------------------  dstat  --------------------\n"
+echo -e "\n--------------------  sysstat --------------------\n"
 sudo apt install -y sysstat
+
+
+# openresty
+echo -e "\n--------------------  openresty  --------------------\n"
+sudo systemctl disable nginx
+sudo systemctl stop nginx
+sudo apt-get -y install --no-install-recommends wget gnupg ca-certificates
+wget -O - https://openresty.org/package/pubkey.gpg | sudo gpg --dearmor -o /usr/share/keyrings/openresty.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/openresty.gpg] http://openresty.org/package/ubuntu $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/openresty.list > /dev/null
+sudo apt-get update
+sudo apt-get -y install openresty
+
+# luarocks
+echo -e "\n--------------------  luarocks  --------------------\n"
+wget http://luarocks.org/releases/luarocks-2.0.13.tar.gz
+tar -xzvf luarocks-2.0.13.tar.gz
+cd luarocks-2.0.13/
+./configure --prefix=/usr/local/openresty/luajit \
+    --with-lua=/usr/local/openresty/luajit/ \
+    --lua-suffix=jit \
+    --with-lua-include=/usr/local/openresty/luajit/include/luajit-2.1
+make
+sudo make install
+
+# luarocks modules
+echo -e "\n--------------------  luarocks modules --------------------\n"
+sudo /usr/local/openresty/luajit/bin/luarocks install lua-resty-cookie
+sudo /usr/local/openresty/luajit/bin/luarocks install lua-resty-jit-uuid
+
 
 
 # listroute 
 # see https://github.com/tetsuzawa/listroute
-curl -L -o listroute.tar.gz https://github.com/tetsuzawa/listroute/releases/download/v0.0.5/listroute_0.0.5_linux_amd64.tar.gz
-tar xvf listroute.tar.gz -C /tmp
-sudo install /tmp/listroute /usr/local/bin/
-sudo rm -rf listroute.tar.gz 
+# curl -L -o listroute.tar.gz https://github.com/tetsuzawa/listroute/releases/download/v0.0.5/listroute_0.0.5_linux_amd64.tar.gz
+# tar xvf listroute.tar.gz -C /tmp
+# sudo install /tmp/listroute /usr/local/bin/
+# sudo rm -rf listroute.tar.gz 
 
 echo -e "\n\nall ok\n"
-```
-
-```shell
-chmod +x setup-tools.sh
-
-rsync -avz setup-tools.sh a:/tmp/
-rsync -avz setup-tools.sh b:/tmp/
-rsync -avz setup-tools.sh c:/tmp/
 ```
 
 各インスタンスで
@@ -213,7 +242,7 @@ git add ...
 git push -u origin main
 ```
 
-## .gitをb, cと共有
+## .gitをisu_2, isu_3と共有
 
 ```shell
 rsync -avz .git isucon@192.168.0.12:~/
@@ -274,50 +303,9 @@ sudo systemctl restart nginx
 sudo systemctl status nginx
 ```
 
-### mysql8をgit addしたいとき
-
-```shell
-mkdir -p ./etc
-mkdir -p ./backup/etc
-sudo cp -r /etc/mysql ./backup/etc/mysql
-sudo mkdir -p /home/isucon/etc/mysql/conf.d
-sudo mkdir -p /home/isucon/etc/mysql/mysql.conf.d
-sudo ln /etc/mysql/conf.d/mysql.cnf /home/isucon/etc/mysql/conf.d/mysql.cnf
-sudo ln /etc/mysql/conf.d/mysqldump.cnf /home/isucon/etc/mysql/conf.d/mysqldump.cnf
-sudo ln /etc/mysql/mysql.conf.d/mysql.cnf /home/isucon/etc/mysql/mysql.conf.d/mysql.cnf
-sudo ln /etc/mysql/mysql.conf.d/mysqld.cnf /home/isucon/etc/mysql/mysql.conf.d/mysqld.cnf
-sudo chmod 755 -R /home/isucon/etc/mysql
-mkdir -p /var/log/mysql
-sudo chmod 777 -R /var/log/mysql
-``````
-
-```shell
-git add etc/mysql
-git commit -m "add mysql conf"
-git push
-```
-
-b, cで
-
-```shell
-git pull
-sudo rm -rf /etc/mysql/conf.d/mysql.cnf       
-sudo rm -rf /etc/mysql/conf.d/mysqldump.cnf   
-sudo rm -rf /etc/mysql/mysql.conf.d/mysql.cnf 
-sudo rm -rf /etc/mysql/mysql.conf.d/mysqld.cnf
-sudo ln /home/isucon/etc/mysql/conf.d/mysql.cnf         /etc/mysql/conf.d/mysql.cnf       
-sudo ln /home/isucon/etc/mysql/conf.d/mysqldump.cnf     /etc/mysql/conf.d/mysqldump.cnf   
-sudo ln /home/isucon/etc/mysql/mysql.conf.d/mysql.cnf   /etc/mysql/mysql.conf.d/mysql.cnf 
-sudo ln /home/isucon/etc/mysql/mysql.conf.d/mysqld.cnf  /etc/mysql/mysql.conf.d/mysqld.cnf
-sudo chmod 775 -R /etc/mysql
-sudo chown -R root:root /etc/mysql
-
-sudo systemctl restart mysql
-sudo systemctl status mysql
-```
-
-
 ## 計測前後のスクリプトを置く
+
+[スクリプト](./prepare-analyze)
 
 ```shell
 mkdir -p $HOME/result

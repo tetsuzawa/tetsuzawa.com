@@ -1,6 +1,7 @@
 # テンプレチューニング
 
-```nginx configuration
+## tuning, access log, trace_id, request_id
+```nginx configuration title=/etc/nginx/nginx.conf
 
 worker_processes auto;
 
@@ -65,5 +66,41 @@ http {
 
     include conf.d/*.conf;
     include sites-enabled/*.conf;
+}
+```
+
+### trace_id
+```nginx configuration title=/etc/nginx/sites-enabled/isucon.conf
+lua_package_path "/path/to/lua-resty-cookie/lib/?.lua;;";
+
+server {
+    # ===================================== trace_id =====================================
+    set $trace_id '';
+    access_by_lua_block {
+        local cookie = require "resty.cookie"
+        local uuid = require "resty.jit-uuid"
+
+        local ck = cookie:new()
+        local trace_id, err = ck:get("trace_id")
+
+        if not (trace_id) or (trace_id == "") then
+            trace_id = uuid.generate_v4()
+            local ok, err = ck:set({
+                key = "trace_id",
+                value = trace_id,
+                path = "/",
+                httponly = true,
+                secure = false, -- set to true if you want to enforce HTTPS
+                max_age = 3600 -- cookie expiration in seconds, adjust as you see fit
+            })
+
+            if not ok then
+                ngx.log(ngx.ERR, err)
+                return
+            end
+        end
+
+        ngx.var.trace_id = trace_id
+    }
 }
 ```
