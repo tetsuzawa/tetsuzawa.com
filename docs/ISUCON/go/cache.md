@@ -4,13 +4,6 @@
 Cache使いたい時(Go1.18以降)
 
 ```go
-package main
-
-import (
-	"sync"
-	"time"
-)
-
 type cache[K comparable, V any] struct {
 	sync.RWMutex
 	items map[K]V
@@ -40,6 +33,12 @@ func (c *cache[K, V]) Get(key K) (V, bool) {
 func (c *cache[K, V]) Del(key K) {
 	c.Lock()
 	delete(c.items, key)
+	c.Unlock()
+}
+
+func (c *cache[K, V]) DelAll() {
+	c.Lock()
+	c.items = make(map[K]V)
 	c.Unlock()
 }
 

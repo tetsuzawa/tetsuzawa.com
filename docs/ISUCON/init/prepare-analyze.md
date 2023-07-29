@@ -39,6 +39,17 @@ sudo systemctl restart xsuportal-api-golang.service
 sudo systemctl restart xsuportal-web-golang.service
 
 # ====== nginx ======
+# mkdir -p /home/isucon/log/nginx
+# sudo touch ${nginx_access_log} ${nginx_error_log}
+# sudo logrotate -f /home/isucon/etc/logrotate.d/nginx
+# sudo cp ${nginx_access_log} ${nginx_access_log}.prev
+# sudo truncate -s 0 ${nginx_access_log}
+# sudo cp ${nginx_error_log} ${nginx_error_log}.prev
+# sudo truncate -s 0 ${nginx_error_log}
+# sudo nginx -t
+# sudo systemctl restart nginx
+
+# ====== openresty ======
 mkdir -p /home/isucon/log/nginx
 sudo touch ${nginx_access_log} ${nginx_error_log}
 sudo logrotate -f /home/isucon/etc/logrotate.d/nginx
@@ -46,8 +57,8 @@ sudo cp ${nginx_access_log} ${nginx_access_log}.prev
 sudo truncate -s 0 ${nginx_access_log}
 sudo cp ${nginx_error_log} ${nginx_error_log}.prev
 sudo truncate -s 0 ${nginx_error_log}
-sudo nginx -t
-# sudo systemctl restart nginx
+sudo openresty -c /etc/nginx/nginx.conf -t
+sudo systemctl restart openresty
 
 # ====== mysql ======
 # sudo touch ${mysql_slow_log} ${mysql_error_log}
@@ -110,6 +121,17 @@ alp json --file=${nginx_access_log} \
   --format markdown \
   --matching-groups ${ALPM}  \
   > ${result_dir}/alp.md
+  
+touch ${result_dir}/alp_trace.md
+cp ${result_dir}/alp_.md ${result_dir}/alp_trace.md.prev
+alp-trace json --file=${nginx_access_log} \
+  --nosave-pos \
+  --sort sum \
+  --reverse \
+  --format markdown \
+  --matching-groups ${ALPM}  \
+  > ${result_dir}/alp_trace.md
+
 
 # mysqlowquery
 # sudo mysqldumpslow -s t ${mysql_slow_log} > ${result_dir}/mysqld-slow.txt
