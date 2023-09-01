@@ -11,6 +11,13 @@ import  _ "net/http/pprof"
 main.go にpprofのハンドラを追加する
 
 ```go
+	handler := func(h http.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			h.ServeHTTP(c.Response(), c.Request())
+			return nil
+		}
+	}
+	
 	prefixRouter := e.Group("/debug/pprof")
 	{
 		prefixRouter.GET("/", handler(pprof.Index))

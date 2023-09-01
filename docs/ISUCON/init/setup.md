@@ -17,22 +17,28 @@ allow write accessにチェックを入れる
 ```shell
 export DEPLOY_KEY_NAME=isucon-xx-xxxxxx
 export ISU_USER=isucon
-export TARGET_HOSTS="35.75.87.180 13.113.71.227 ..."
+export TARGET_HOSTS="isu_1 isu_2 isu_3"
 bash -c '
 set -eu
 for HOST in $TARGET_HOSTS; do
     echo "--------------------------------------"
     echo "host: $HOST, DEPLOY_KEY_NAME: $DEPLOY_KEY_NAME"
     
-    rsync -avz ~/.ssh/$DEPLOY_KEY_NAME $ISU_USER@$HOST:~/.ssh/id_rsa
-    rsync -avz ~/.ssh/$DEPLOY_KEY_NAME.pub $ISU_USER@$HOST:~/.ssh/id_rsa.pub
+    rsync -avz ~/.ssh/$DEPLOY_KEY_NAME $ISU_USER@$HOST:/home/isucon/.ssh/id_rsa
+    rsync -avz ~/.ssh/$DEPLOY_KEY_NAME.pub $ISU_USER@$HOST:/home/isucon/.ssh/id_rsa.pub
 done'
 ```
 
 ## (一応) デプロイキーのpub keyで各インスタンス内から相互にsshできるようにする
 
 ```shell
-bash -c 'for HOST in $TARGET_HOSTS; do ssh $ISU_USER@$HOST "cat /home/isucon/.ssh/id_rsa.pub >> /home/isucon/.ssh/authorized_keys"; done'
+printenv | sort | grep -E '^isu_.+=' | bash -c 'while IFS="=" read -r host ip; do echo -e "Host $host\n    HostName $ip\n    User isucon\n    IdentityFile ~/.ssh/id_rsa\n    ServerAliveInterval 60\n    StrictHostKeyChecking no\n"; done' > /tmp/sshd_config
+bash -c '
+set -eu
+for HOST in $TARGET_HOSTS; do 
+    ssh $ISU_USER@$HOST "cat /home/isucon/.ssh/id_rsa.pub >> /home/isucon/.ssh/authorized_keys"
+    rsync -avz /tmp/sshd_config $ISU_USER@$HOST:/home/isucon/.ssh/config
+done'
 ```
 
 
@@ -94,7 +100,7 @@ alp --version
 
 # alp-trace
 echo -e "\n--------------------  alp-trace  --------------------\n"
-curl -sSLo alp-trace.zip https://github.com/tetsuzawa/alp-trace/releases/download/v0.0.5/alp-trace_linux_amd64.zip
+curl -sSLo alp-trace.zip https://github.com/tetsuzawa/alp-trace/releases/download/v0.0.8/alp-trace_linux_amd64.zip
 unzip alp-trace.zip
 sudo install alp-trace /usr/local/bin/alp-trace
 rm -rf alp-trace alp-trace.zip
@@ -195,6 +201,8 @@ cd luarocks-2.0.13/
     --with-lua-include=/usr/local/openresty/luajit/include/luajit-2.1
 make
 sudo make install
+cd ..
+rm -rf luarocks-2.0.13 luarocks-2.0.13.tar.gz
 
 # luarocks modules
 echo -e "\n--------------------  luarocks modules --------------------\n"
@@ -267,6 +275,13 @@ sudo systemctl list-units --type=service
 sudo systemctl cat isucon-xx.service
 ```
 
+## LISTEN中のポートとプロセス名を確認したいとき
+
+```shell
+sudo netstat -ntlp
+```
+
+
 ### nginxをgit addしたいとき
 
 aで
@@ -303,6 +318,45 @@ sudo systemctl restart nginx
 sudo systemctl status nginx
 ```
 
+### openrestyをgit addしたいとき
+
+aで
+
+```shell
+mkdir -p /home/isucon/etc
+mkdir -p /home/isucon/log /home/isucon/log/nginx
+mkdir -p /home/isucon/backup/etc
+cp -r /usr/local/openresty/nginx /home/isucon/backup/etc/nginx
+sudo mv /usr/local/openresty/nginx /home/isucon/etc/nginx
+sudo ln -s /home/isucon/etc/nginx /usr/local/openresty/nginx
+sudo chmod 775 -R /home/isucon/etc/nginx
+sudo chmod 775 /home/isucon/log/nginx
+sudo chmod 777 -R /home/isucon/log/nginx/*
+sudo chmod 777 -R /var/log/nginx
+sudo openresty -t
+```
+
+```shell
+git add /home/isucon/backup /home/isucon/etc
+git commit -m "add openresty conf"
+git push origin main
+```
+
+b, cで
+
+```shell
+git pull origin main
+sudo rm -rf /usr/local/openresty/nginx
+sudo ln -s /home/isucon/etc/nginx /usr/local/openresty/nginx
+sudo chmod 775 /usr/local/openresty/nginx
+sudo chown -R root:root /usr/local/openresty/nginx
+mkdir -p /home/isucon/log/nginx
+sudo openresty -t
+sudo systemctl restart openresty
+sudo systemctl status openresty
+```
+
+
 ## 計測前後のスクリプトを置く
 
 [スクリプト](./prepare-analyze)
@@ -311,13 +365,11 @@ sudo systemctl status nginx
 mkdir -p $HOME/result
 ```
 
-
 ## appのログ吐き出し先を変える
 
 ```shell
 mkdir -p $HOME/log
 ```
-
 
 よしなに
 

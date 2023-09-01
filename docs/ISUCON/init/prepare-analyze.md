@@ -16,8 +16,10 @@ echo "# Prepare"
 cat > /tmp/prepared_env <<EOF
 prepared_time="`date +'%Y-%m-%d %H:%M:%S'`"
 app_log="/home/isucon/log/app/app.log"
+app_journal_log="/home/isucon/log/app/journal.log"
 nginx_access_log="/home/isucon/log/nginx/access.log"
 nginx_error_log="/home/isucon/log/nginx/error.log"
+nginx_journal_log="/home/isucon/log/nginx/journal.log"
 mysql_slow_log="/var/log/mysql/mysqld-slow.log"
 mysql_error_log="/var/log/mysql/error.log"
 result_dir="/home/isucon/result"
@@ -102,7 +104,9 @@ echo "# Analyze"
 result_dir=$HOME/result
 mkdir -p ${result_dir}
 
-#sudo journalctl --since="${prepared_time}" | gzip -9c > "${data_dir}/journal.log.gz"
+# journal log
+sudo journalctl --since="${prepared_time}" > "${app_journal_log}"
+sudo journalctl --since="${prepared_time}" > "${nginx_journal_log}"
 
 # alp
 # ALPM="/int/\d+,/uuid/[A-Za-z0-9_]+,/6digits/[a-z0-9]{6}"
@@ -122,14 +126,17 @@ alp json --file=${nginx_access_log} \
   --matching-groups ${ALPM}  \
   > ${result_dir}/alp.md
   
+OUTFORMT=count,uri_method_status,min,max,sum,avg,p95,trace_id_sample
 touch ${result_dir}/alp_trace.md
-cp ${result_dir}/alp_.md ${result_dir}/alp_trace.md.prev
+cp ${result_dir}/alp_trace.md ${result_dir}/alp_trace.md.prev
 alp-trace json --file=${nginx_access_log} \
   --nosave-pos \
   --sort sum \
   --reverse \
+  --output ${OUTFORMT} \
   --format markdown \
   --matching-groups ${ALPM}  \
+  --trace \
   > ${result_dir}/alp_trace.md
 
 
@@ -138,7 +145,6 @@ alp-trace json --file=${nginx_access_log} \
 
 # touch ${result_dir}/pt-query-digest.txt
 # cp ${result_dir}/pt-query-digest.txt ${result_dir}/pt-query-digest.txt.prev
-# pt-query-digest --explain "h=${DB_HOST},u=${DB_USER},p=${DB_PASS},D=${DB_DATABASE}" ${mysql_slow_log} \
-#   > ${result_dir}/pt-query-digest.txt
+# pt-query-digest --explain "h=${DB_HOST},u=${DB_USER},p=${DB_PASS},D=${DB_DATABASE}" --progress percentage,5 ${mysql_slow_log} > ${result_dir}/pt-query-digest.txt
 # pt-query-digest ${mysql_slow_log} > ${result_dir}/pt-query-digest.txt
 ```

@@ -44,13 +44,15 @@ systemdのExecStartでもともとのnginx confを読むように指定させれ
 -ExecStartPre=/usr/local/openresty/nginx/sbin/nginx -t -q -g 'daemon on; master_process on;'
 -ExecStart=/usr/local/openresty/nginx/sbin/nginx -g 'daemon on; master_process on;'
 -ExecReload=/usr/local/openresty/nginx/sbin/nginx -g 'daemon on; master_process on;' -s reload
+-ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /usr/local/openresty/nginx/logs/nginx.pid
 +PIDFile=/var/run/nginx.pid
 +ExecStartPre=/usr/local/openresty/nginx/sbin/nginx -c /etc/nginx/nginx.conf -t -q -g 'daemon on; master_process on;'
 +ExecStart=/usr/local/openresty/nginx/sbin/nginx -c /etc/nginx/nginx.conf -g 'daemon on; master_process on;'
 +ExecReload=/usr/local/openresty/nginx/sbin/nginx -c /etc/nginx/nginx.conf -g 'daemon on; master_process on;' -s reload
- ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /usr/local/openresty/nginx/logs/nginx.pid
++ExecStop=-/sbin/start-stop-daemon --quiet --stop --retry QUIT/5 --pidfile /var/run/nginx.pid
  TimeoutStopSec=5
  KillMode=mixed
++LimitNOFILE=65535
 ```
 
 

@@ -54,15 +54,27 @@ http {
                                 '"response_time":"$upstream_response_time",'
                                 '"vhost":"$host",'
                                 '"request_id":"$request_id",'
+                                '"trace_id":"$trace_id",'
                                 '"cache_status":"$upstream_cache_status"}';
 
     access_log  /home/isucon/log/nginx/access.log json;
     error_log  /home/isucon/log/nginx/error.log;
+    
+    proxy_set_header X-Request-ID $request_id;
+    proxy_set_header X-Trace-ID $trace_id;
 
     # TLS configuration
     ssl_protocols TLSv1.2;
     ssl_prefer_server_ciphers on;
     ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+    
+    # ================================ trace_id ================================
+    # https://github.com/thibaultcha/lua-resty-jit-uuid
+    init_worker_by_lua_block {
+        require "resty.core"    
+        local uuid = require 'resty.jit-uuid'
+        uuid.seed()
+    }
 
     include conf.d/*.conf;
     include sites-enabled/*.conf;

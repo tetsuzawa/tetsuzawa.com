@@ -58,6 +58,6 @@ LimitNOFILE=65535
 ```
 
 ```shell
-sudo daemon-reload
+sudo systemctl daemon-reload
 sudo systemctl restart ...
 ```

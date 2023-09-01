@@ -7,7 +7,7 @@
 
 ## nginxのチューニング
 
-[NGINXのチューニング](../nginx/template-tuning.mdd) を参考にやる。
+[NGINXのチューニング](../nginx/template-tuning.md) を参考にやる。
 
 
 ## 静的ファイル配信
