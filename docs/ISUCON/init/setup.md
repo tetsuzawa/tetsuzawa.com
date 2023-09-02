@@ -126,7 +126,7 @@ pt-query-digest --version
 
 # go
 echo -e "\n--------------------  go  --------------------\n"
-curl -sSLo go.tar.gz https://go.dev/dl/go1.20.3.linux-amd64.tar.gz
+curl -sSLo go.tar.gz https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go.tar.gz
 sudo rm -rf go.tar.gz
 echo 'export PATH=/usr/local/go/bin:$PATH' >> ~/.bash_profile
