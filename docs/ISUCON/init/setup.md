@@ -375,7 +375,7 @@ mkdir -p $HOME/log
 
 ## nginxをalpに対応させる&吐き出し先を変える
 
-access logの設定を [access logをalpに対応する](../nginx/alp) を参考にやる。
+access logの設定を [access logをalpに対応する](../nginx/template-tuning.md) を参考にやる。
 
 メインのファイルを読んで [analyze.sh](./prepare-analyze) のalpのmatch stringを書き換える。
 
