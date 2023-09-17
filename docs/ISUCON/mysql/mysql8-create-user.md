@@ -12,6 +12,8 @@ CREATE USER 'admin'@'%' IDENTIFIED BY 'password';
 GRANT ALL ON *.* TO 'admin'@'%';
 ```
 
+(MySQL 8系ではGRANT .... IDENTIFIED BY ... でユーザー作成と権限付与を同時することはできなくなった）
+
 ※ mysql-server自体が外部からアクセスできるようになってないといけない。変更後は再起動が必要
 
 ```diff title="/etc/mysql/mysql.conf.d/mysqld.cnf"
