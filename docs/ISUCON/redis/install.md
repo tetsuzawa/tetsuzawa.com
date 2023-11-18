@@ -19,3 +19,8 @@ sudo apt install -y redis
 ```shell
 redis-server --version
 ```
+
+
+使い方は公式参照
+
+https://github.com/redis/go-redis
