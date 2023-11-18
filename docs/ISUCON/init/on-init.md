@@ -12,6 +12,21 @@ ansible-playbook sites.yml -vv
 ansible-playbook sites.yml -vv --start-at-task='<task名>'
 ```
 
+特定のタスクをスキップしたいときはtagsをつけて --skip-tags すればよい
+
+```yaml
+- name: want to skip
+  ansible.builtin.shell:
+    cmd: |
+      ...
+  tags:
+    - onlyvm
+```
+
+```shell
+ansible-playbook sites.yml -vv --start-at-task='<task名>' --skip-tags 'onlyvm'
+```
+
 ## 初期ファイルをgit add
 
 `du -sh *` とか`ls -alh` とかで頑張る
@@ -107,6 +122,25 @@ sudo openresty -t
 sudo systemctl restart openresty
 sudo systemctl status openresty
 ```
+
+
+### varnishをgit addしたいとき 
+
+aで
+
+```shell
+mkdir -p /home/isucon/etc
+mkdir -p /home/isucon/backup/etc/varnish
+sudo cp -rv /etc/varnish/default.vcl /home/isucon/backup/etc/varnish/defulat.vcl
+sudo mv -v /etc/varnish/default.vcl /home/isucon/etc/varnish/default.vcl
+sudo ln -s /home/isucon/etc/varnish/default.vcl /etc/varnish/default.vcl
+sudo chmod 777 -R /home/isucon/etc/varnish
+```
+
+```shell
+
+```
+
 
 ## github subscribe
 
