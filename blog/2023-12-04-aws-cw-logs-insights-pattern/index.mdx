@@ -1,0 +1,364 @@
+---
+slug: cw-logs-insights-pattern-query
+title: CloudWatch Logs Insightsのpattern queryでISUCON13のログを自動分類してみた
+description: CARTA TECH BLOGアドベントカレンダー 12/3の記事です。最近出たCloudWatch Logs Insightsのpattern queryがとても便利だったのでISUCON13のログで試してみました。
+authors: [tetsuzawa]
+tags: [aws, cloudwatch, isucon]
+keywords: [aws, cloudwatch, isucon]
+image: ./hero.png
+---
+
+import Image from '@theme/IdealImage';
+import cost from './cost.png';
+import pattern from './pattern.png';
+import pattern_inspect from './pattern_inspect.png';
+import pattern_log_sample from './pattern_log_sample.png';
+import pattern_related from './pattern_related.png';
+import pattern_token from './pattern_token.png';
+
+
+たき([@tetsuzawa](https://x.com/tetsuzawa))です。
+
+この記事は[CARTA TECH BLOGアドベントカレンダー](https://techblog.cartaholdings.co.jp/entry/2023/12/01/110348) 12/3の記事です。
+
+前日は弊社CTOのsuzukenさんの[エンジニアリングとキャリアと経営](https://techblog.cartaholdings.co.jp/entry/2023/12/02/150020) でした。
+
+## pattern queryとは
+
+機械学習の力でログデータを自動的にパターンにクラスター化してくれる機能です。
+
+7月にクエリ自体は[リリース](https://aws.amazon.com/jp/about-aws/whats-new/2023/07/amazon-cloudwatch-ml-backed-logs-insights-pattern-query-command/)されていましたが、11月末にUIがリッチになって直接クエリを叩かなくてもパターンを見ることができるようになりました([リリース](https://aws.amazon.com/jp/about-aws/whats-new/2023/11/aws-cloudwatch-logs-anomaly-detection-pattern-analysis/))。
+
+
+
+実際に見るほうが早いと思うので使用例を示します。
+
+## 使用例
+
+
+### アプリケーションの構成と生ログ
+
+以下の構成のWebアプリケーションで出力されるログをクエリしてみます。
+
+中身はISUCON13のログです。大きな意味はないのでいろんなパターンでログが吐かれてるんだなーくらいに見ていただけると良いと思います。
+
+```
+クライアント -> PowerDNS
+         -> nginx -> isupipe-go (アプリケーション)
+```
+
+<details>
+    <summary>PowerDNSのログ</summary>
+
+    ```jsonl
+    {"MESSAGE":"Remote 192.168.0.10 wants 'xcs1ol4k3trf4pqiz0.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants '7yqzg751ubgtr50p64hkr60.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants '4ypjo9m3ab5jaobkk9b10.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants 'v2ww3uw32ua1ybsfmp1lam7n0.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants '6iaslyz7knwnr0.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants 'zcn0i0cpoiecjgw7xt8t7nnhbfaygvk0.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants 'q6rhnem740hfmf8ax37arbjblh0.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants 'q67mywtus10.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    {"MESSAGE":"Remote 192.168.0.10 wants 'nj5i9zqc7qsfw3tkpbmmluyph0.u.isucon.dev&#124;A', do = 0, bufsize = 512"}
+    ```
+</details>
+
+<details>
+    <summary>Nginxのaccess.log</summary>
+
+    ```jsonl
+    {"time":"03/Dec/2023:15:52:06 +0000","host":"135.125.246.110","forwardedfor":"","req":"POST / HTTP/1.1","status":"405","method":"POST","uri":"/","body_bytes":556,"referer":"","ua":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36","accept_encoding":"gzip, deflate","request_time":0.0,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"","vhost":"52.194.34.45","request_id":"b439ce68614a04b9fd0b5eedbcbd578b"}
+    {"time":"03/Dec/2023:15:52:06 +0000","host":"135.125.246.110","forwardedfor":"","req":"GET /.env HTTP/1.1","status":"404","method":"GET","uri":"/.env","body_bytes":552,"referer":"","ua":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36","accept_encoding":"gzip, deflate","request_time":0.0,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"","vhost":"52.194.34.45","request_id":"197efd02bf817cb93dfbe86997f9a30a"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"POST /api/register HTTP/2.0","status":"499","method":"POST","uri":"/api/register","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":0.108,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"0.108","vhost":"pipe.u.isucon.dev","request_id":"be27a6c225b14d6809d283f4c58ec901"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"POST /api/icon HTTP/1.1","status":"201","method":"POST","uri":"/api/icon","body_bytes":36,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":0.03,"if_none_match":"","cache":"MISS","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"0.028","vhost":"pipe.u.isucon.dev","request_id":"0017a53d64faac5553ab5056d47ccaee"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"GET /api/livestream/search?limit=50 HTTP/1.1","status":"499","method":"GET","uri":"/api/livestream/search?limit=50","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":0.242,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"0.242","vhost":"pipe.u.isucon.dev","request_id":"98ce70bdb4fabbfade91a39a70fd4c5b"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"GET /api/livestream/7616/statistics HTTP/1.1","status":"499","method":"GET","uri":"/api/livestream/7616/statistics","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":15.118,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"15.118","vhost":"kazuyasato0.u.isucon.dev","request_id":"b89190d4cbec4826bced4ff56aee21ee"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"GET /api/user/nfukuda0/statistics HTTP/1.1","status":"499","method":"GET","uri":"/api/user/nfukuda0/statistics","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":1.088,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"1.088","vhost":"pipe.u.isucon.dev","request_id":"6ebf4304989ea56a0660ca3cdbef9f4c"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"GET /api/livestream/search?tag=%E6%8A%95%E8%B3%87 HTTP/1.1","status":"499","method":"GET","uri":"/api/livestream/search?tag=%E6%8A%95%E8%B3%87","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":0.712,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"0.712","vhost":"pipe.u.isucon.dev","request_id":"9c40fbd61ccab885aa4876299419910f"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"GET /api/livestream/search?limit=50 HTTP/1.1","status":"499","method":"GET","uri":"/api/livestream/search?limit=50","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":0.696,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"0.696","vhost":"pipe.u.isucon.dev","request_id":"ddf88c6da57843a0f447f186d5bea4ed"}
+    {"time":"03/Dec/2023:15:45:10 +0000","host":"192.168.0.10","forwardedfor":"","req":"GET /api/livestream/7638/reaction HTTP/1.1","status":"499","method":"GET","uri":"/api/livestream/7638/reaction","body_bytes":0,"referer":"","ua":"isucandar","accept_encoding":"gzip, deflate, br","request_time":0.183,"if_none_match":"","cache":"","upstream_http_cache_status":"","upstream_cache_status":"","runtime":"","response_time":"0.183","vhost":"shoheiinoue0.u.isucon.dev","request_id":"527e512f0957a51b37491339bd7eb968"}
+    ```
+</details>
+
+<details>
+    <summary>Nginxのerror.log</summary>
+
+    ```jsonl
+    {"log":"2023/12/03 15:45:08 [error] 29118#29118: *2011 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/haruka870/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:08 [error] 29118#29118: *2011 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/haruka870/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29117#29117: *2204 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/aokitaro0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29117#29117: *2204 [lua] isupipe.conf:67):2: 画像にアクセスしたけどファイルが無かったよ: /api/user/aokitaro0/icon, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/aokitaro0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29117#29117: *2204 [lua] isupipe.conf:67):2: 画像にアクセスしたけどファイルが無かったよ: /api/user/ishikawakana0/icon, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/ishikawakana0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29117#29117: *2204 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/ishikawakana0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29117#29117: *2204 [lua] isupipe.conf:67):2: 画像にアクセスしたけどファイルが無かったよ: /api/user/nakamurakaori0/icon, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/nakamurakaori0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29117#29117: *2204 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/nakamurakaori0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29118#29118: *2175 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/mmatsuda0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29118#29118: *2175 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/mmatsuda0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    {"log":"2023/12/03 15:45:07 [error] 29118#29118: *2175 [lua] isupipe.conf:58):2: 画像にアクセスお試し: /home/isucon/webapp/public/img/$1.jpeg: nil, client: 192.168.0.10, server: u.isucon.dev, request: \"GET /api/user/mmatsuda0/icon HTTP/1.1\", host: \"pipe.u.isucon.dev:443\""}
+    ```
+
+</details>
+
+
+<details>
+    <summary>isupipe-goのアプリケーションログ</summary>
+
+    isupipe-goのログにはエラーログやアクセスログを含みます。
+
+
+    ```jsonl
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.363324152Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/search?limit=50\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":754920938,\"latency_human\":\"754.920938ms\",\"bytes_in\":0,\"bytes_out\":63552}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.358528846Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"bhasegawa0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7632/livecomment\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":159586020,\"latency_human\":\"159.58602ms\",\"bytes_in\":0,\"bytes_out\":28448}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.348991333Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/search?limit=50\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":732721964,\"latency_human\":\"732.721964ms\",\"bytes_in\":0,\"bytes_out\":63552}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.336478879Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/icon\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":43030348,\"latency_human\":\"43.030348ms\",\"bytes_in\":123696,\"bytes_out\":16}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.334189182Z\",\"level\":\"DEBUG\",\"prefix\":\"echo\",\"file\":\"user_handler.go\",\"line\":\"181\",\"message\":\"ファイルを削除 : filename=/home/isucon/webapp/public/img/hiroshiyoshida1.jpeg\"}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.323442779Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"vkobayashi0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7552/reaction?limit=10\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":64429139,\"latency_human\":\"64.429139ms\",\"bytes_in\":0,\"bytes_out\":9963}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.31673288Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"shoheiinoue0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7638/reaction\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":199664973,\"latency_human\":\"199.664973ms\",\"bytes_in\":0,\"bytes_out\":18036}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.313961761Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"satomikobayashi0.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/livestream/7648/reaction\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":19553756,\"latency_human\":\"19.553756ms\",\"bytes_in\":22,\"bytes_out\":1858}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.309699408Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/register\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":112108320,\"latency_human\":\"112.10832ms\",\"bytes_in\":364,\"bytes_out\":480}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.308750543Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"satomigoto0.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/livestream/7646/livecomment\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":44676147,\"latency_human\":\"44.676147ms\",\"bytes_in\":77,\"bytes_out\":1896}"}
+    {"MESSAGE":"pam_unix(sudo:session): session closed for user root"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.300018152Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/icon\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":24474770,\"latency_human\":\"24.47477ms\",\"bytes_in\":132684,\"bytes_out\":16}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.291358999Z\",\"level\":\"DEBUG\",\"prefix\":\"echo\",\"file\":\"user_handler.go\",\"line\":\"189\",\"message\":\"ファイルが存在しないのでなにもしない: filename=/home/isucon/webapp/public/img/mfujiwara0.jpeg\"}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.287800587Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"satomikobayashi0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7648/reaction\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":62967361,\"latency_human\":\"62.967361ms\",\"bytes_in\":0,\"bytes_out\":3955}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.273964726Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"rikasuzuki0.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/livestream/reservation\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":92325991,\"latency_human\":\"92.325991ms\",\"bytes_in\":337,\"bytes_out\":1177}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.260031825Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/login\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":12243593,\"latency_human\":\"12.243593ms\",\"bytes_in\":49,\"bytes_out\":0}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.247607728Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"satomigoto0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7646/livecomment\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":130710572,\"latency_human\":\"130.710572ms\",\"bytes_in\":0,\"bytes_out\":10225}"}
+    {"MESSAGE":"pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1100)"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.246331855Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"vkobayashi0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7552/livecomment?limit=10\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":158803356,\"latency_human\":\"158.803356ms\",\"bytes_in\":0,\"bytes_out\":10308}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.244247877Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/register\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":99137320,\"latency_human\":\"99.13732ms\",\"bytes_in\":361,\"bytes_out\":477}"}
+    {"MESSAGE":"  isucon : PWD=/home/isucon/webapp/go ; USER=root ; COMMAND=/usr/bin/pdnsutil add-record u.isucon.dev yamaguchiharuka0 A 0 192.168.0.11"}
+    {"MESSAGE":"pam_unix(sudo:session): session closed for user root"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.192758178Z\",\"level\":\"INFO\",\"prefix\":\"echo\",\"file\":\"livestream_handler.go\",\"line\":\"118\",\"message\":\"1704337200 ~ 1704340800予約枠の残数 = 4\\n\"}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.188325909Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"pipe.u.isucon.dev\",\"method\":\"POST\",\"uri\":\"/api/icon\",\"user_agent\":\"isucandar\",\"status\":201,\"error\":\"\",\"latency\":67230540,\"latency_human\":\"67.23054ms\",\"bytes_in\":73504,\"bytes_out\":16}"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.183425959Z\",\"level\":\"DEBUG\",\"prefix\":\"echo\",\"file\":\"user_handler.go\",\"line\":\"189\",\"message\":\"ファイルが存在しないのでなにもしない: filename=/home/isucon/webapp/public/img/atsushi200.jpeg\"}"}
+    {"MESSAGE":"pam_unix(sudo:session): session opened for user root(uid=0) by (uid=1100)"}
+    {"MESSAGE":"  isucon : PWD=/home/isucon/webapp/go ; USER=root ; COMMAND=/usr/bin/pdnsutil add-record u.isucon.dev mfujiwara0 A 0 192.168.0.11"}
+    {"MESSAGE":"{\"time\":\"2023-12-03T15:45:10.173413514Z\",\"id\":\"\",\"remote_ip\":\"127.0.0.1\",\"host\":\"satomikobayashi0.u.isucon.dev\",\"method\":\"GET\",\"uri\":\"/api/livestream/7648/livecomment\",\"user_agent\":\"isucandar\",\"status\":200,\"error\":\"\",\"latency\":69052170,\"latency_human\":\"69.05217ms\",\"bytes_in\":0,\"bytes_out\":4207}"}
+    {"MESSAGE":"[ERROR] remote upload queue is full, dropping a profile job"}
+    {"MESSAGE":"[ERROR] remote upload queue is full, dropping a profile job"}
+    {"MESSAGE":"[DEBUG] profiling session reset 2023-12-03 15:45:47.52292662 +0000 UTC m=+120.004947896"}
+    {"MESSAGE":"2023/12/03 15:45:52 traces export: context deadline exceeded: retry-able request failure"}
+    {"MESSAGE":"[DEBUG] profiling session reset 2023-12-03 15:45:32.524990214 +0000 UTC m=+105.007011490"}
+    {"MESSAGE":"[DEBUG] content type: multipart/form-data; boundary=6a0058274a590a9542fd811b4d9cd4a07502d6464486acfc9a6f7f29fa02"}
+    {"MESSAGE":"[DEBUG] uploading at http://monitoring:4040/ingest?aggregationType=&from=1701618272&name=calculator%7B__session_id__%3Dd031bf497c418be5%2Chostname%3Disuports%7D&sampleRate=100&spyName=gospy&units=&until=1701618287"}
+    {"MESSAGE":"[ERROR] upload profile: do http request: Post \"http://monitoring:4040/ingest?aggregationType=&from=1701618257&name=calculator%7B__session_id__%3Dd031bf497c418be5%2Chostname%3Disuports%7D&sampleRate=100&spyName=gospy&units=&until=1701618272\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+    {"MESSAGE":"[DEBUG] content type: multipart/form-data; boundary=14ed36b29bdadfbbe8b4f0b9b70349417c099d0bd35c8d07785d3a74f32e"}
+    {"MESSAGE":"[ERROR] upload profile: do http request: Post \"http://monitoring:4040/ingest?aggregationType=average&from=1701618257&name=calculator%7B__session_id__%3Dd031bf497c418be5%2Chostname%3Disuports%7D&sampleRate=0&spyName=gospy&units=goroutines&until=1701618272\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+    {"MESSAGE":"[DEBUG] uploading at http://monitoring:4040/ingest?aggregationType=average&from=1701618272&name=calculator%7B__session_id__%3Dd031bf497c418be5%2Chostname%3Disuports%7D&sampleRate=0&spyName=gospy&units=goroutines&until=1701618287"}
+    {"MESSAGE":"[DEBUG] uploading at http://monitoring:4040/ingest?aggregationType=sum&from=1701618272&name=calculator%7B__session_id__%3Dd031bf497c418be5%2Chostname%3Disuports%7D&sampleRate=100&spyName=gospy&units=samples&until=1701618287"}
+    {"MESSAGE":"[ERROR] upload profile: do http request: Post \"http://monitoring:4040/ingest?aggregationType=sum&from=1701618257&name=calculator%7B__session_id__%3Dd031bf497c418be5%2Chostname%3Disuports%7D&sampleRate=100&spyName=gospy&units=samples&until=1701618272\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+    {"MESSAGE":"[DEBUG] profiling session reset 2023-12-03 15:45:17.523979146 +0000 UTC m=+90.006000423"}
+    {"MESSAGE":"2023/12/03 15:45:22 traces export: context deadline exceeded: retry-able request failure"}
+    {"MESSAGE":"[DEBUG] profiling session reset 2023-12-03 15:45:02.527283967 +0000 UTC m=+75.009305249"}
+    ```
+
+</details>
+
+
+### pattern queryの実行
+
+上記のようなログに対して pattern queryを叩くと、以下のような結果が得られます。
+
+```
+pattern @message
+```
+
+<Image img={pattern} alt="pattern"/>
+
+自動的にパターンを解析した結果とイベント数、比率、ログレベルから勝手に分類してくれるSeverity typeが表示されています。
+
+
+左にある`Inspect`をクリックすると、パターンを解析した結果の詳細を見ることができます。
+
+<Image img={pattern_inspect} alt="pattern_inspect"/>
+
+
+
+#### クラスター化されたログのサンプルが見れる
+
+<Image img={pattern_log_sample} alt="pattern_log_sample"/>
+
+タブからログのサンプルを確認できるのはとても便利ですね。
+
+集計結果から生のログを見れるのは個人的にとても評価が高いです。
+
+#### クラスター化されたトークンの集計とサンプルが見れる
+
+<Image img={pattern_token} alt="pattern_token"/>
+
+トークンにどんな値が入っているかの集計も見ることができます。
+
+ISUCONで使うなら特定のパラメーター（今回でいうとサブドメイン）のリクエストが偏ってないかなどの確認に役立つと思います。
+
+#### 関連するログを見ることができる
+
+<Image img={pattern_related} alt="pattern_related"/>
+
+このログが出力されたときに関連してどのようなログが吐かれていたか確認することもできます。
+
+複数のアプリケーションやコンポーネント間でログの関連性が見えるようになるのでとてもよいですね。
+
+
+## 料金
+
+pattern query自体の料金は通常のCloudWatch Logs Insightsと同じでスキャン量課金です（スキャンしたデータ 1 GB あたり 0.0076USD）。
+
+その他、データの取り込みに0.76USD/GBかかります。
+
+参考: https://aws.amazon.com/jp/cloudwatch/pricing/
+
+
+自分がISUCON13の感想戦環境で試したときは15回ほどベンチを回したときのログの取り込み量は15GBでした。（途中誤ってjournaldのログをすべて取り込んでいたのでここまでの増え方はしないかもしれないです）
+
+ベンチごとに何度かpattern queryを叩いていたと思いますが、請求額は7.6USDほどでした。
+
+無料枠分計算がずれていますがほとんどがデータの取り込み料だと思われます。
+
+クエリを叩く分にはスキャン範囲に気をつければ気にするほどのコストにはならないのではないでしょうか。
+
+クエリのスキャン量を減らすためには、日時範囲を狭めたり、そもそもエラーログのみをCloudWatch Logsに取り込むようにすると良いかもしれませんね。
+
+<Image img={cost} alt="cost"/>
+
+
+
+## まとめ
+
+集計クエリを都度書かなくても自動でパターンを分類して集計されるのはとても便利でした。
+
+jsonなどで構造化されてなくても雑に分析できるのは使い勝手がよいですね。
+
+ISUCONで使うなら、エラーログのみをCloudWatch Logsに取り込むようにしておいて、pattern queryでエラーの集計を見ると良いかもしれません。
+
+また、個人的にAWSのリリース方法が面白いなと思いました。先にクエリだけリリースしてアーリーアダプターを引き込みつつ、効果が実証されたらクエリを知らない人でも使いやすいようにUIを用意するというのは意図があったかはわからないですが参考にしようと思います。
+
+
+## おまけ
+
+ISUCONのログはfluent-bitでCloudWatch Logsに送っていました。conf類を置いていおくので参考にしたい方はどうぞ。
+
+<details>
+    <summary>fluent-bitの設定ファイルなど</summary>
+
+
+    ```console
+    $ find /etc/fluent-bit/
+    /etc/fluent-bit/
+    /etc/fluent-bit/parsers.conf
+    /etc/fluent-bit/fluent-bit.conf
+    /etc/fluent-bit/plugins.conf
+    ```
+
+    ```console
+    $ cat /etc/fluent-bit/fluent-bit.conf
+    [SERVICE]
+    flush             10
+    daemon            Off
+    log_level         info
+    parsers_file      parsers.conf
+    plugins_file      plugins.conf
+
+
+    [INPUT]
+    Name              systemd
+    Tag               host.*
+    Systemd_Filter    _SYSTEMD_UNIT=isupipe-go.service
+    Read_From_Tail    On
+
+    [INPUT]
+    Name              systemd
+    Tag               host.*
+    Systemd_Filter    _SYSTEMD_UNIT=pdns.service
+    Read_From_Tail    On
+
+    [FILTER]
+    Name              record_modifier
+    Match             host.*
+    Allowlist_key     MESSAGE
+
+    [OUTPUT]
+    Name              cloudwatch_logs
+    Match             host.*
+    region            ap-northeast-1
+    log_group_name    isucon13
+    log_stream_prefix ${HOSTNAME}.
+    auto_create_group On
+
+    [INPUT]
+    Name              tail
+    Path              /home/isucon/log/nginx/access.log
+    Parser            json
+    Tag               nginx.access.log
+
+    [INPUT]
+    Name              tail
+    Path              /home/isucon/log/nginx/error.log
+    Tag               nginx.error.log
+
+    [OUTPUT]
+    Name              cloudwatch_logs
+    Match             nginx.*
+    region            ap-northeast-1
+    log_group_name    isucon13
+    log_stream_prefix ${HOSTNAME}.
+    auto_create_group On
+    ```
+
+    ```console
+    $ cat /etc/fluent-bit/parsers.conf
+    [PARSER]
+    Name              json
+    Format            json
+    Time_Key          time
+    Time_Format       %Y-%m-%dT%H:%M:%S.%LZ
+    ```
+
+    ```console
+    $ cat /etc/fluent-bit/plugins.conf
+    [PLUGINS]
+    # Path /path/to/out_gstdout.so
+    ```
+
+    ```console
+    $ sudo systemctl cat fluent-bit.service
+    # /lib/systemd/system/fluent-bit.service
+    [Unit]
+    Description=Fluent Bit
+    Documentation=https://docs.fluentbit.io/manual/
+    Requires=network.target
+    After=network.target
+
+    [Service]
+    Type=simple
+    EnvironmentFile=-/etc/sysconfig/fluent-bit
+    EnvironmentFile=-/etc/default/fluent-bit
+    EnvironmentFile=-/home/isucon/awsenv.sh
+    ExecStart=/opt/fluent-bit/bin/fluent-bit -c //etc/fluent-bit/fluent-bit.conf
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+
+    ```console
+    $ cat awsenv.sh
+    AWS_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXX
+    AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ```
+
+
+</details>
+
+
+
+
+
+
+
+
+
+
+
+
+
